@@ -101,6 +101,8 @@ if get_option('memory-swap-path') != ''
   nntrainer_swapdir = get_option('memory-swap-path')
 endif
 
+nntrainer_swap_lookahead = get_option('memory-swap-lookahead')
+
 # handle resources
 nntrainer_resdir = meson.build_root() / 'res'
 run_command('mkdir', '-p', nntrainer_resdir)
@@ -122,6 +124,7 @@ nntrainer_conf.set('PLUGIN_INSTALL_PREFIX', nntrainer_libdir / 'nntrainer')
 nntrainer_conf.set('INCLUDE_INSTALL_DIR', nntrainer_includedir / '..')
 nntrainer_conf.set('MEMORY_SWAP', nntrainer_enable_swap)
 nntrainer_conf.set('MEMORY_SWAP_PATH', nntrainer_swapdir)
+nntrainer_conf.set('MEMORY_SWAP_LOOKAHEAD', nntrainer_swap_lookahead)
 
 dummy_dep = dependency('', required: false)
 found_dummy_dep = declare_dependency() # dummy dep to use if found
