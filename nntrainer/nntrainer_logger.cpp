@@ -66,7 +66,7 @@ Logger::Cleanup::~Cleanup() {
 
 Logger::~Logger() { outputstream.close(); }
 
-Logger::Logger() {
+Logger::Logger() : ts_type(NNTRAINER_LOG_TIMESTAMP_SEC) {
   struct tm lt;
   time_t t = time(0);
   struct tm *now = localtime_r(&t, &lt);
@@ -90,10 +90,8 @@ Logger::Logger() {
 void Logger::log(const std::string &message,
                  const nntrainer_loglevel loglevel) {
   std::lock_guard<std::mutex> guard(smutex);
-  time_t t = time(0);
-  struct tm lt;
-  struct tm *now = localtime_r(&t, &lt);
   std::stringstream ss;
+
   switch (loglevel) {
   case NNTRAINER_LOG_INFO:
     ss << "[NNTRAINER INFO  ";
@@ -111,11 +109,25 @@ void Logger::log(const std::string &message,
     break;
   }
 
-  ss << std::dec << (now->tm_year + 1900) << '-' << std::setfill('0')
-     << std::setw(2) << (now->tm_mon + 1) << '-' << std::setfill('0')
-     << std::setw(2) << now->tm_mday << ' ' << std::setfill('0') << std::setw(2)
-     << now->tm_hour << ':' << std::setfill('0') << std::setw(2) << now->tm_min
-     << ':' << std::setfill('0') << std::setw(2) << now->tm_sec << ']';
+  if (ts_type == NNTRAINER_LOG_TIMESTAMP_MS) {
+    static auto start = std::chrono::system_clock::now().time_since_epoch();
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch() - start)
+                .count();
+
+    ss << "[ " << ms << " ]";
+  } else if (ts_type == NNTRAINER_LOG_TIMESTAMP_SEC) {
+    time_t t = time(0);
+    struct tm lt;
+    struct tm *now = localtime_r(&t, &lt);
+
+    ss << std::dec << (now->tm_year + 1900) << '-' << std::setfill('0')
+       << std::setw(2) << (now->tm_mon + 1) << '-' << std::setfill('0')
+       << std::setw(2) << now->tm_mday << ' ' << std::setfill('0')
+       << std::setw(2) << now->tm_hour << ':' << std::setfill('0')
+       << std::setw(2) << now->tm_min << ':' << std::setfill('0')
+       << std::setw(2) << now->tm_sec << ']';
+  }
 
   outputstream << ss.str() << " " << message << std::endl;
 }

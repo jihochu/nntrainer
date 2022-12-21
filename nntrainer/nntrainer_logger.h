@@ -42,6 +42,14 @@ typedef enum {
   NNTRAINER_LOG_ERROR
 } nntrainer_loglevel;
 
+/**
+ * @brief     Log TimeStamp type
+ */
+typedef enum {
+  NNTRAINER_LOG_TIMESTAMP_SEC = 0,
+  NNTRAINER_LOG_TIMESTAMP_MS,
+} nntrainer_log_timestamp;
+
 namespace nntrainer {
 
 /**
@@ -63,6 +71,11 @@ public:
    */
   void log(const std::string &message,
            const nntrainer_loglevel loglevel = NNTRAINER_LOG_INFO);
+
+  /**
+   * @brief     Set timestamp type
+   */
+  void setTimeStampType(nntrainer_log_timestamp type) { ts_type = type; }
 
 protected:
   /**
@@ -101,6 +114,7 @@ private:
   Logger(const Logger &);
   Logger &operator=(const Logger &);
   static std::mutex smutex;
+  nntrainer_log_timestamp ts_type;
 };
 } /* namespace nntrainer */
 
