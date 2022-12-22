@@ -63,7 +63,7 @@ public:
   virtual unsigned int requestMemory(
     size_t bytes, unsigned int start_time, unsigned int end_time,
     std::vector<unsigned int> exec_order = std::vector<unsigned int>(),
-    TensorLifespan lifespan = TensorLifespan::MAX_LIFESPAN);
+    bool is_wgrad = false);
 
   /**
    * @brief Plan the layout with memory planner
@@ -198,6 +198,9 @@ private:
   std::vector<size_t> memory_offset; /**< offsets for the memory requested */
   std::vector<std::vector<unsigned int>>
     memory_exec_order; /**< execution order for the requested memory */
+
+  std::vector<bool>
+    memory_is_wgrad; /**< index for identification of weight gradient */
 
   void *mem_pool; /**< memory pool allocated at once */
 
