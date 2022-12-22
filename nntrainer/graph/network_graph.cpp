@@ -85,7 +85,13 @@ int NetworkGraph::compile(const std::string &loss_type) {
 
 void NetworkGraph::setExecutionOrder() {
   auto max_count = graph.size() * 3;
-  /** @todo: remove backwarding count for non-trainble layers */
+  size_t trainables = 0;
+
+  for (auto iter = cbegin(); iter != cend(); iter++) {
+    if ((*iter)->getTrainable())
+      trainables++;
+  }
+
   for (auto iter = cbegin(); iter != cend(); iter++) {
     auto &node = *iter;
     auto order_idx = iter - cbegin();
@@ -93,6 +99,11 @@ void NetworkGraph::setExecutionOrder() {
     auto calc_gradient_order = max_count - ((order_idx + 1) * 2);
     /** calc derivative is called right after calc_gradient */
     auto calc_derivative_order = calc_gradient_order + 1;
+    if (node->getTrainable()) {
+      trainables--;
+      calc_gradient_order -= trainables;
+      calc_derivative_order = calc_gradient_order;
+    }
     node->setExecutionOrder(
       {forward_order, calc_gradient_order, calc_derivative_order});
   }
