@@ -17,13 +17,11 @@ outlog=""
 count=0
 while true; do
     if [ -d "/proc/$process_id" ]; then
-	output=`grep VmHWM /proc/$process_id/status`
-	read -ra mem_str <<< "$output"
-	count=$((count + 1))
-	mem_usage=$((${mem_str[1]}))
-	cpu_output=""
-	n=`nproc`
-	i=0
+		count=$((count + 1))
+		mem_usage=`cat /proc/$process_id/smaps | grep -E "Rss" | awk '{sum += $2;}END{print sum;}'`
+		cpu_output=""
+		n=`nproc`
+		i=0
 	while [ "$i" -lt $n ]
 	do
 	    cpu_freq=`cat /sys/devices/system/cpu/cpu$i/cpufreq/scaling_cur_freq`
