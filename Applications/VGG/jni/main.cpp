@@ -31,7 +31,7 @@ const unsigned int num_train = 100;
 
 const unsigned int num_val = 20;
 
-const unsigned int batch_size = 128;
+const unsigned int batch_size = 64;
 
 const unsigned int feature_size = 3072;
 
@@ -74,9 +74,9 @@ createRealDataGenerator(const std::string &directory, unsigned int batch_size,
                         unsigned int data_split) {
 
   UserDataType train_data(new nntrainer::util::Cifar100DataLoader(
-    directory + "/vgg_trainingSet.dat", batch_size, 1));
+    directory + "/100_trainingSet.dat", batch_size, 1));
   UserDataType valid_data(new nntrainer::util::Cifar100DataLoader(
-    directory + "/vgg_valSet.dat", batch_size, 1));
+    directory + "/100_valSet.dat", batch_size, 1));
 
   return {std::move(train_data), std::move(valid_data)};
 }

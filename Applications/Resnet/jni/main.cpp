@@ -201,10 +201,14 @@ ModelHandle createResnet18() {
 /// @todo support "LOSS : cross" for TF_Lite Exporter
 #if defined(ENABLE_TEST)
   ModelHandle model = ml::train::createModel(ml::train::ModelType::NEURAL_NET,
-                                             {withKey("loss", "mse")});
+                                             {withKey("loss", "mse"),
+                                             withKey("memory_swap", "true"),
+                                             withKey("memory_swap_lookahead", "1")});
 #else
   ModelHandle model = ml::train::createModel(ml::train::ModelType::NEURAL_NET,
-                                             {withKey("loss", "cross")});
+                                             {withKey("loss", "mse"),
+                                             withKey("memory_swap", "true"),
+                                             withKey("memory_swap_lookahead", "1")});
 #endif
 
   for (auto layer : createResnet18Graph()) {
@@ -244,7 +248,7 @@ void createAndRun(unsigned int epochs, unsigned int batch_size,
                       withKey("epochs", epochs),
                       withKey("save_path", "resnet_full.bin")});
 
-  auto optimizer = ml::train::createOptimizer("adam", {"learning_rate=0.001"});
+  auto optimizer = ml::train::createOptimizer("sgd", {"learning_rate=0.001"});
   model->setOptimizer(std::move(optimizer));
 
   int status = model->compile();
