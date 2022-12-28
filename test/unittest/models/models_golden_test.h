@@ -97,6 +97,7 @@ protected:
     label_dim = std::get<2>(param);
     iteration = std::get<3>(param);
     options = std::get<4>(param);
+
   }
 
   /**

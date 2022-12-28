@@ -85,23 +85,24 @@ int NetworkGraph::compile(const std::string &loss_type) {
 
 void NetworkGraph::setExecutionOrder() {
   auto max_count = graph.size() * 3;
-  size_t trainables = 0;
+  size_t not_trainables = 0;
 
   for (auto iter = cbegin(); iter != cend(); iter++) {
-    if ((*iter)->getTrainable())
-      trainables++;
+    if (!(*iter)->getTrainable())
+      not_trainables++;
   }
 
   for (auto iter = cbegin(); iter != cend(); iter++) {
     auto &node = *iter;
     auto order_idx = iter - cbegin();
     auto forward_order = order_idx;
-    auto calc_gradient_order = max_count - ((order_idx + 1) * 2);
+    auto calc_gradient_order =
+      max_count - ((order_idx + 1) * 2) - not_trainables;
     /** calc derivative is called right after calc_gradient */
     auto calc_derivative_order = calc_gradient_order + 1;
-    if (node->getTrainable()) {
-      trainables--;
-      calc_gradient_order -= trainables;
+    if (!node->getTrainable()) {
+      not_trainables--;
+      calc_gradient_order++;
       calc_derivative_order = calc_gradient_order;
     }
     node->setExecutionOrder(
