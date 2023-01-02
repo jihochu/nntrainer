@@ -154,7 +154,7 @@ static Tensor *requestTensor_(const TensorSpecV2 &spec,
     << "Modifying view cannot be requested, the request type has to be "
        "delegated to either view or unique";
 
-  auto [forward, calc_grad, calc_deriv] = exec_order;
+  auto [forward, calc_grad, calc_deriv, apply_grad] = exec_order;
 
   std::vector<unsigned> order = spec.additional_exec_order;
   if (expose) {
@@ -171,6 +171,9 @@ static Tensor *requestTensor_(const TensorSpecV2 &spec,
   }
   if (enum_class_or(spec.ls, LS::CALC_DERIV_LIFESPAN) == spec.ls) {
     order.push_back(calc_deriv);
+  }
+  if (enum_class_or(spec.ls, LS::CALC_AGRAD_LIFESPAN) == spec.ls) {
+    order.push_back(apply_grad);
   }
 
   switch (spec.request_type) {
@@ -351,12 +354,12 @@ void Manager::initializeTensorsTrain(unsigned int max_exec_order_) {
 std::vector<Weight *> Manager::requestWeights(
   const GraphNode &node, const std::vector<Weight::Spec> &weights_spec,
   bool trainable, const std::vector<std::string> &shared_names) {
-  const auto [forwarding_order, calcGradient_order, calcDerivative_order] =
+  const auto [forwarding_order, calcGradient_order, calcDerivative_order, applyGradient_order] =
     node.getExecutionOrder();
 
-  std::vector<unsigned int> var_exec_order(
+  std::vector<unsigned int> default_var_exec_order(
     {forwarding_order, calcDerivative_order});
-  std::vector<unsigned int> default_grad_exec_order({calcDerivative_order});
+  std::vector<unsigned int> default_grad_exec_order;
 
   TensorLifespan var_ls = TensorLifespan::MAX_LIFESPAN;
   TensorLifespan grad_ls = TensorLifespan::BACKWARD_FUNC_LIFESPAN;
@@ -367,10 +370,14 @@ std::vector<Weight *> Manager::requestWeights(
   for (unsigned int i = 0; i < weights_spec.size(); ++i) {
     auto &[dim, t_initializer, w_reg, w_reg_const, decay, clip_by_global_norm,
            need_gradient, name] = weights_spec.at(i);
+    auto var_exec_order = default_var_exec_order;
     auto grad_exec_order = default_grad_exec_order;
 
-    if (trainable)
-      grad_exec_order.insert(grad_exec_order.begin(), calcGradient_order);
+    if (trainable) {
+      var_exec_order.push_back(applyGradient_order);
+      grad_exec_order.push_back(calcGradient_order);
+      grad_exec_order.push_back(applyGradient_order);
+    }
 
     /**
      * If the weight is supposed to be clip by global norm, extend its exec
@@ -417,13 +424,13 @@ std::vector<Weight *> Manager::requestWeights(
 }
 
 /**
- * @brief     Create weights with the given spec
+ * @brief     Create tensors with the given spec
  *
  */
 std::vector<Var_Grad *> Manager::requestTensors(
   const GraphNode &node, const std::vector<Var_Grad::Spec> &tensors_spec,
   bool trainable, const std::vector<std::string> &shared_names) {
-  const auto [forwarding_order, calcGradient_order, calcDerivative_order] =
+  const auto [forwarding_order, calcGradient_order, calcDerivative_order, applyGradient_order] =
     node.getExecutionOrder();
 
   std::vector<Var_Grad *> ret;
@@ -449,6 +456,11 @@ std::vector<Var_Grad *> Manager::requestTensors(
     if (enum_class_logical_and(tspan, TensorLifespan::CALC_DERIV_LIFESPAN)) {
       var_exec_order.push_back(calcDerivative_order);
       grad_exec_order.push_back(calcDerivative_order);
+    }
+
+    if (trainable && enum_class_logical_and(tspan, TensorLifespan::CALC_AGRAD_LIFESPAN)) {
+      var_exec_order.push_back(applyGradient_order);
+      grad_exec_order.push_back(applyGradient_order);
     }
 
     bool is_dependent = !shared_names.empty();
@@ -495,7 +507,7 @@ Manager::requestInputs(const GraphNode &node,
   using RT = TensorSpecV2::RequestType;
 
   TensorSpecV2 var_common_spec, grad_common_spec;
-  var_common_spec.ls = TensorLifespan::FORWARD_GRAD_LIFESPAN;
+  var_common_spec.ls = TensorLifespan::FORWARD_GRAD_AGRAD_LIFESPAN;
   grad_common_spec.ls = TensorLifespan::CALC_DERIV_LIFESPAN;
 
   /// @todo handle this inside layer

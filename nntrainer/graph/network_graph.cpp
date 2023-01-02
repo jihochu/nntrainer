@@ -84,7 +84,8 @@ int NetworkGraph::compile(const std::string &loss_type) {
 }
 
 void NetworkGraph::setExecutionOrder() {
-  auto max_count = graph.size() * 3;
+  auto order_size = std::tuple_size<GraphNode::ExecutionOrder>{};
+  auto max_count = graph.size() * order_size;
   size_t not_trainables = 0;
 
   for (auto iter = cbegin(); iter != cend(); iter++) {
@@ -97,16 +98,18 @@ void NetworkGraph::setExecutionOrder() {
     auto order_idx = iter - cbegin();
     auto forward_order = order_idx;
     auto calc_gradient_order =
-      max_count - ((order_idx + 1) * 2) - not_trainables;
+      max_count - ((order_idx + 1) * (order_size - 1)) - not_trainables;
     /** calc derivative is called right after calc_gradient */
     auto calc_derivative_order = calc_gradient_order + 1;
+    auto apply_gradient_order = calc_derivative_order + 1;
     if (!node->getTrainable()) {
       not_trainables--;
       calc_gradient_order++;
       calc_derivative_order = calc_gradient_order;
+      apply_gradient_order = calc_derivative_order;
     }
     node->setExecutionOrder(
-      {forward_order, calc_gradient_order, calc_derivative_order});
+      {forward_order, calc_gradient_order, calc_derivative_order, apply_gradient_order});
   }
 
   /**
@@ -114,7 +117,7 @@ void NetworkGraph::setExecutionOrder() {
    * This set max execution order is used to extend gradient exec orders for
    * clipping.
    */
-  graph_exec_end = std::get<2>((*(cbegin()))->getExecutionOrder());
+  graph_exec_end = std::get<3>((*(cbegin()))->getExecutionOrder());
 }
 
 void NetworkGraph::addLayerNode(std::unique_ptr<Layer> layer) {
@@ -315,6 +318,10 @@ void NetworkGraph::setBatchSize(unsigned int batch_size) {
 
 void NetworkGraph::applyGradients(
   LayerNode *node, const std::function<void(Weight &)> &apply_func) {
+
+  if (!node->getTrainable())
+    return;
+
   auto &rc = node->getRunContext();
   auto num_weight = rc.getNumWeights();
   for (unsigned i = 0; i < num_weight; ++i) {
@@ -905,7 +912,7 @@ int NetworkGraph::initialize(const std::vector<Connection> &model_input_names,
     auto const &lnode = getSortedLayerNode(idx);
     auto &rc = lnode->getRunContext();
     auto first_grad_access = std::get<1>(lnode->getExecutionOrder());
-    auto last_grad_access = std::get<2>(lnode->getExecutionOrder());
+    auto last_grad_access = std::get<3>(lnode->getExecutionOrder());
     for (unsigned i = 0; i < rc.getNumWeights(); ++i) {
       if (!rc.weightHasGradient(i)) {
         /// @todo this is duck taping that MUST BE REMOVED. We will need to
