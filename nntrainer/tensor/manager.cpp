@@ -527,7 +527,7 @@ Manager::requestInputs(const GraphNode &node,
   using RT = TensorSpecV2::RequestType;
 
   TensorSpecV2 var_common_spec, grad_common_spec;
-  var_common_spec.ls = TensorLifespan::FORWARD_GRAD_AGRAD_LIFESPAN;
+  var_common_spec.ls = TensorLifespan::FORWARD_GRAD_LIFESPAN;
   grad_common_spec.ls = TensorLifespan::CALC_DERIV_LIFESPAN;
 
   /// @todo handle this inside layer

@@ -32,7 +32,6 @@ struct MemoryRequest {
   unsigned int loc;   /**< index/location of the this request */
   size_t size;        /**< size of the request */
   size_t offset;      /**< offset for this request */
-  size_t size_from_offset;
 
   /**
    * @brief Constructor for the Memory Request
@@ -44,8 +43,7 @@ struct MemoryRequest {
     end(valid.second),
     loc(idx),
     size(s),
-    offset(0),
-    size_from_offset(0) {}
+    offset(0) {}
 };
 
 static size_t computeSpace(unsigned int exec_order,
@@ -240,7 +238,6 @@ size_t OptimizedV3Planner::planLayout(
     req.offset = max_offset;
     memory_offset[req.loc] = max_offset;
     memory_req = std::max(memory_req, req.offset + req.size);
-    req.size_from_offset = req.size;
     sorted_req.push_back(&req);
   }
 

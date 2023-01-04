@@ -450,9 +450,9 @@ LayerNode *NetworkGraph::computeBackwardEnd() {
     int cur_order = std::get<0>(exec_order);
     if (ln->needsCalcDerivative() || ln->needsCalcGradient()) {
 #ifdef ENABLE_TEST
-      cur_order = std::get<2>(exec_order);
+      cur_order = std::get<3>(exec_order);
 #else
-      cur_order = std::get<1>(exec_order);
+      cur_order = std::get<2>(exec_order);
 #endif
     }
 
@@ -492,7 +492,7 @@ void NetworkGraph::allocateTensors(ExecutionMode exec_mode_) {
      * usage less than the max_exec_order are allocated.
      */
     tensor_manager->allocateTensors(
-      std::get<2>(backward_iter_end->getExecutionOrder()));
+      std::get<3>(backward_iter_end->getExecutionOrder()));
   }
 }
 
