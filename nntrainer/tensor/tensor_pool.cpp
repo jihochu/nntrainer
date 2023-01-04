@@ -180,7 +180,7 @@ void TensorPool::finalize(const MemoryPlanner &planner,
      */
     details->token = mem_pool->requestMemory(
       spec.tensor->bytes(), validity_start, validity_end + 1,
-      details->exec_order, spec.is_weight_grad);
+      details->exec_order, details->lifespan, spec.is_weight_grad);
 
 #ifdef DEBUG
     if (details->token == 0)
