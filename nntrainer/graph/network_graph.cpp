@@ -326,8 +326,7 @@ void NetworkGraph::applyGradients(
   if (!node->getTrainable())
     return;
 
-  TRACE_MEMORY() << node->getName() + ": AG";
-  TRACE_TIME() << node->getName() + ": AG";
+  PROFILE_MEM_ANNOTATE("ApplyGradient: " + node->getName());
 
   auto &rc = node->getRunContext();
   auto num_weight = rc.getNumWeights();
@@ -354,6 +353,9 @@ void NetworkGraph::applyGradients(
 
     apply_func(rc.getWeightObject(i));
   }
+
+  TRACE_MEMORY() << node->getName() + ": AG";
+  TRACE_TIME() << node->getName() + ": AG";
 }
 
 sharedConstTensors

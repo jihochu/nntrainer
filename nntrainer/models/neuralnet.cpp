@@ -313,13 +313,13 @@ void NeuralNetwork::backwarding(int iteration,
      */
 
     model_graph.flushCacheExcept(std::get<1>(node->getExecutionOrder()));
-    PROFILE_MEM_ANNOTATE("CalcGradient: " + node->getName());
 
     bool apply_gradient = true;
 
     /** If gradient optimization mode, then calculate gradient first */
     if (dynamic_training_opt.isGradientMode())
       node->calcGradient();
+
 
     /**
      * If optimization off, or gradient must be applied, then this will be
@@ -340,20 +340,17 @@ void NeuralNetwork::backwarding(int iteration,
     if (!dynamic_training_opt.isGradientMode() && apply_gradient)
       node->calcGradient();
 
-    model_graph.flushCacheExcept(std::get<2>(node->getExecutionOrder()));
-    PROFILE_MEM_ANNOTATE("CalcDerivative: " + node->getName());
-
     if (stop_cb(nullptr)) {
       return;
     }
 
+    model_graph.flushCacheExcept(std::get<2>(node->getExecutionOrder()));
+
     if (node->needsCalcDerivative())
       node->calcDerivative();
 
-    model_graph.flushCacheExcept(std::get<3>(node->getExecutionOrder()));
-    PROFILE_MEM_ANNOTATE("ApplyGradient: " + node->getName());
-
     if (apply_gradient) {
+      model_graph.flushCacheExcept(std::get<3>(node->getExecutionOrder()));
       /// Apply gradient only at the end of the last shared weight access
       model_graph.applyGradients(
         node.get(), [iteration, opt_ = opt.get()](Weight &w) {
