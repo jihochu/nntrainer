@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Copyright (C) 2020 Jijoong Moon <jijoong.moon@samsung.com>
- *
  * @file   main.cpp
- * @date   05 Oct 2020
+ * @date   07 December 2022
  * @see    https://github.com/nnstreamer/nntrainer
- * @author Jijoong Moon <jijoong.moon@samsung.com>
- * @bug	   No known bugs except for NYI items
- * @brief  This is VGG Example with
+ * @author Donghak Park <donghak.park@samsung.com>
+ * @bug    No known bugs except for NYI items
+ * @brief  This is Simple Linear Example with
+ *
  *
  */
-
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -19,41 +17,19 @@
 #include <vector>
 
 #include <cifar_dataloader.h>
+#include <layer.h>
 #include <model.h>
-#include <profiler.h>
+#include <optimizer.h>
 
-/**
- * @brief     Data size for each category
- */
-const unsigned int num_class = 100;
-
-const unsigned int num_train = 100;
-
-const unsigned int num_val = 20;
-
-const unsigned int batch_size = 64;
-
-const unsigned int feature_size = 3072;
-
-unsigned int train_count = 0;
-unsigned int val_count = 0;
-
-int width = 32;
-
-int height = 32;
-
-int channel = 3;
-
-unsigned int seed;
-
-std::string resource;
-
-float training_loss = 0.0;
-float validation_loss = 0.0;
-float last_batch_loss = 0.0;
-
+using LayerHandle = std::shared_ptr<ml::train::Layer>;
 using ModelHandle = std::unique_ptr<ml::train::Model>;
 using UserDataType = std::unique_ptr<nntrainer::util::DataLoader>;
+
+unsigned int DATA_SIZE;
+unsigned int BATCH_SIZE;
+unsigned int INPUT_SHAPE[3];
+unsigned int OUTPUT_SHAPE[3];
+float training_loss = 0.0;
 
 int trainData_cb(float **input, float **label, bool *last, void *user_data) {
   auto data = reinterpret_cast<nntrainer::util::DataLoader *>(user_data);
@@ -62,135 +38,55 @@ int trainData_cb(float **input, float **label, bool *last, void *user_data) {
   return 0;
 }
 
-int validData_cb(float **input, float **label, bool *last, void *user_data) {
-  auto data = reinterpret_cast<nntrainer::util::DataLoader *>(user_data);
+std::array<UserDataType, 1> createFakeDataGenerator(unsigned int batch_size) {
 
-  data->next(input, label, last);
-  return 0;
-}
+  UserDataType train_data(new nntrainer::util::RandomDataLoader(
+    {{batch_size, INPUT_SHAPE[0], INPUT_SHAPE[1], INPUT_SHAPE[2]}},
+    {{batch_size, OUTPUT_SHAPE[0], OUTPUT_SHAPE[1], OUTPUT_SHAPE[2]}},
+    DATA_SIZE));
 
-std::array<UserDataType, 2>
-createRealDataGenerator(const std::string &directory, unsigned int batch_size,
-                        unsigned int data_split) {
-
-  UserDataType train_data(new nntrainer::util::Cifar100DataLoader(
-    directory + "/100_trainingSet.dat", batch_size, 1));
-  UserDataType valid_data(new nntrainer::util::Cifar100DataLoader(
-    directory + "/100_valSet.dat", batch_size, 1));
-
-  return {std::move(train_data), std::move(valid_data)};
+  return {std::move(train_data)};
 }
 
 int main(int argc, char *argv[]) {
+  int status = 0;
 
-  if (argc < 3) {
-    std::cout << "./nntrainer_vgg vgg.ini resource\n";
-    exit(-1);
-  }
-  std::shared_ptr<nntrainer::profile::GenericProfileListener> listener;
-
-#ifdef PROFILE
-  listener = std::make_shared<nntrainer::profile::GenericProfileListener>();
-#endif
-  PROFILE_BEGIN(listener);
-
-  seed = time(NULL);
-  srand(seed);
-
-  const std::vector<std::string> args(argv + 1, argv + argc);
-  std::string config = args[0];
-  resource = args[1];
-
-  std::array<UserDataType, 2> user_datas;
-
-  try {
-    user_datas = createRealDataGenerator(resource, batch_size, 1);
-  } catch (const std::exception &e) {
-    std::cerr << "uncaught error while creating data generator! details: "
-              << e.what() << std::endl;
+  if (argc != 10) {
+    std::cerr << "Usage: " << argv[0] << " config.ini input_shape[0] "
+              << "input_shape[1] input_shape[2] output_shape[0] "
+              << "output_shape[1] output_shape[2] data_size batch_size"
+              << std::endl;
     return 1;
   }
 
-  auto &[train_user_data, valid_user_data] = user_datas;
+  auto config = argv[1];
+  INPUT_SHAPE[0] = atoi(argv[2]);
+  INPUT_SHAPE[1] = atoi(argv[3]);
+  INPUT_SHAPE[2] = atoi(argv[4]);
+  OUTPUT_SHAPE[0] = atoi(argv[5]);
+  OUTPUT_SHAPE[1] = atoi(argv[6]);
+  OUTPUT_SHAPE[2] = atoi(argv[7]);
+  DATA_SIZE = atoi(argv[8]);
+  BATCH_SIZE = atoi(argv[9]);
 
-  std::unique_ptr<ml::train::Dataset> dataset_train;
-  try {
-    dataset_train = ml::train::createDataset(
-      ml::train::DatasetType::GENERATOR, trainData_cb, train_user_data.get());
-  } catch (const std::exception &e) {
-    std::cerr << "Error during create train dataset: " << e.what() << std::endl;
-    return 1;
-  }
+  std::array<UserDataType, 1> user_datas;
+  user_datas = createFakeDataGenerator(DATA_SIZE);
+  auto &[train_user_data] = user_datas;
 
-  std::unique_ptr<ml::train::Dataset> dataset_valid;
-  try {
-    dataset_valid = ml::train::createDataset(
-      ml::train::DatasetType::GENERATOR, validData_cb, valid_user_data.get());
-  } catch (const std::exception &e) {
-    std::cerr << "Error during create valid dataset: " << e.what() << std::endl;
-    return 1;
-  }
+  std::unique_ptr<ml::train::Model> model;
 
-  /**
-   * @brief     Neural Network Create & Initialization
-   */
+  model = createModel(ml::train::ModelType::NEURAL_NET);
+  model->load(config, ml::train::ModelFormat::MODEL_FORMAT_INI);
 
-  ModelHandle model;
-  try {
-    model = ml::train::createModel(ml::train::ModelType::NEURAL_NET);
-  } catch (const std::exception &e) {
-    std::cerr << "Error during create model: " << e.what() << std::endl;
-    return 1;
-  }
+  model->compile();
+  model->initialize();
 
-  try {
-    model->load(config, ml::train::ModelFormat::MODEL_FORMAT_INI);
-  } catch (const std::exception &e) {
-    std::cerr << "Error during loadFromConfig: " << e.what() << std::endl;
-    return 1;
-  }
+  auto dataset_train = ml::train::createDataset(
+    ml::train::DatasetType::GENERATOR, trainData_cb, train_user_data.get());
+  model->setDataset(ml::train::DatasetModeType::MODE_TRAIN,
+                    std::move(dataset_train));
 
-  try {
-    model->compile();
-  } catch (const std::exception &e) {
-    std::cerr << "Error during compile: " << e.what() << std::endl;
-    return 1;
-  }
+  model->train();
 
-  try {
-    model->initialize();
-  } catch (const std::exception &e) {
-    std::cerr << "Error during ininitialize: " << e.what() << std::endl;
-    return 1;
-  }
-
-  try {
-    model->setDataset(ml::train::DatasetModeType::MODE_TRAIN,
-                      std::move(dataset_train));
-  } catch (const std::exception &e) {
-    std::cerr << "Error during set train dataset: " << e.what() << std::endl;
-    return 1;
-  }
-
-  try {
-    model->setDataset(ml::train::DatasetModeType::MODE_VALID,
-                      std::move(dataset_valid));
-  } catch (const std::exception &e) {
-    std::cerr << "Error during set valid dataset: " << e.what() << std::endl;
-    return 1;
-  }
-
-  try {
-    model->train();
-    training_loss = model->getTrainingLoss();
-    validation_loss = model->getValidationLoss();
-    last_batch_loss = model->getLoss();
-  } catch (const std::exception &e) {
-    std::cerr << "Error during train: " << e.what() << std::endl;
-    return 1;
-  }
-
-  PROFILE_END(listener);
-
-  return 0;
+  return status;
 }

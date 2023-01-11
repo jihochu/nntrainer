@@ -17,6 +17,7 @@
 #include <memory>
 #include <sstream>
 #include <vector>
+#include <cstring>
 
 #if defined(ENABLE_TEST)
 #include <gtest/gtest.h>

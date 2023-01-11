@@ -18,7 +18,8 @@ count=0
 while true; do
     if [ -d "/proc/$process_id" ]; then
 		count=$((count + 1))
-		mem_usage=`cat /proc/$process_id/smaps | grep -E "Rss" | awk '{sum += $2;}END{print sum;}'`
+		#mem_usage=`cat /proc/$process_id/smaps | grep -E "Rss" | awk '{sum += $2;}END{print sum;}'`
+		mem_usage=`cat /proc/$process_id/status | grep -E "VmHWM" | awk '{print $2;}'`
 		cpu_output=""
 		n=`nproc`
 		i=0
@@ -30,7 +31,7 @@ while true; do
 	done
 	outlog="$outlog$count $mem_usage kB $cpu_output\n"
 	let mem_peak='mem_usage > mem_peak ? mem_usage : mem_peak'
-	sleep 1s # configure the sleep time if the program does not run long enough
+	sleep 0.01s # configure the sleep time if the program does not run long enough
     else
 	break
     fi

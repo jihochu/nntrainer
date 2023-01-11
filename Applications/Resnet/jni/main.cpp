@@ -1,15 +1,3 @@
-// SPDX-License-Identifier: Apache-2.0
-/**
- * Copyright (C) 2020 Jihoon Lee <jhoon.it.lee@samsung.com>
- *
- * @file   main.cpp
- * @date   24 Jun 2021
- * @todo   move resnet model creating to separate sourcefile
- * @brief  task runner for the resnet
- * @see    https://github.com/nnstreamer/nntrainer
- * @author Jihoon Lee <jhoon.it.lee@samsung.com>
- * @bug    No known bugs except for NYI items
- */
 #include <array>
 #include <chrono>
 #include <ctime>
@@ -18,37 +6,18 @@
 #include <sstream>
 #include <vector>
 
-#if defined(ENABLE_TEST)
-#include <gtest/gtest.h>
-#endif
-
+#include <cifar_dataloader.h>
 #include <layer.h>
 #include <model.h>
 #include <optimizer.h>
 
-#include <cifar_dataloader.h>
-
-#ifdef PROFILE
-#include <profiler.h>
-#endif
-
 using LayerHandle = std::shared_ptr<ml::train::Layer>;
 using ModelHandle = std::unique_ptr<ml::train::Model>;
-
 using UserDataType = std::unique_ptr<nntrainer::util::DataLoader>;
 
 /** cache loss values post training for test */
 float training_loss = 0.0;
-float validation_loss = 0.0;
 
-/**
- * @brief make "key=value" from key and value
- *
- * @tparam T type of a value
- * @param key key
- * @param value value
- * @return std::string with "key=value"
- */
 template <typename T>
 static std::string withKey(const std::string &key, const T &value) {
   std::stringstream ss;
@@ -75,16 +44,6 @@ static std::string withKey(const std::string &key,
   return ss.str();
 }
 
-/**
- * @brief resnet block
- *
- * @param block_name name of the block
- * @param input_name name of the input
- * @param filters number of filters
- * @param kernel_size number of kernel_size
- * @param downsample downsample to make output size 0
- * @return std::vector<LayerHandle> vectors of layers
- */
 std::vector<LayerHandle> resnetBlock(const std::string &block_name,
                                      const std::string &input_name, int filters,
                                      int kernel_size, bool downsample) {
@@ -141,11 +100,6 @@ std::vector<LayerHandle> resnetBlock(const std::string &block_name,
   }
 }
 
-/**
- * @brief Create resnet 18
- *
- * @return vector of layers that contain full graph of resnet18
- */
 std::vector<LayerHandle> createResnet18Graph() {
   using ml::train::createLayer;
 
@@ -196,21 +150,12 @@ std::vector<LayerHandle> createResnet18Graph() {
   return layers;
 }
 
-/// @todo update createResnet18 to be more generic
 ModelHandle createResnet18() {
-/// @todo support "LOSS : cross" for TF_Lite Exporter
-#if defined(ENABLE_TEST)
   ModelHandle model = ml::train::createModel(ml::train::ModelType::NEURAL_NET,
                                              {withKey("loss", "mse"),
-                                             withKey("memory_swap", "true"),
-                                             withKey("memory_swap_lookahead", "1")});
-#else
-  ModelHandle model = ml::train::createModel(ml::train::ModelType::NEURAL_NET,
-                                             {withKey("loss", "mse"),
-                                             withKey("memory_swap", "true"),
-                                             withKey("memory_swap_lookahead", "1")});
-#endif
-
+                                              withKey("memory_swap", "true"),
+                                              withKey("memory_swap_lookahead", "0")
+                                              });
   for (auto layer : createResnet18Graph()) {
     model->addLayer(layer);
   }
@@ -225,169 +170,50 @@ int trainData_cb(float **input, float **label, bool *last, void *user_data) {
   return 0;
 }
 
-int validData_cb(float **input, float **label, bool *last, void *user_data) {
-  auto data = reinterpret_cast<nntrainer::util::DataLoader *>(user_data);
-
-  data->next(input, label, last);
-  return 0;
-}
-
-#if defined(ENABLE_TEST)
-TEST(Resnet_Training, verify_accuracy) {
-  EXPECT_FLOAT_EQ(training_loss, 4.389328);
-  EXPECT_FLOAT_EQ(validation_loss, 11.611803);
-}
-#endif
-
 /// @todo maybe make num_class also a parameter
 void createAndRun(unsigned int epochs, unsigned int batch_size,
-                  UserDataType &train_user_data,
-                  UserDataType &valid_user_data) {
+                  UserDataType &train_user_data) {
   ModelHandle model = createResnet18();
-  model->setProperty({withKey("batch_size", batch_size),
-                      withKey("epochs", epochs),
-                      withKey("save_path", "resnet_full.bin")});
+  model->setProperty(
+    {withKey("batch_size", batch_size), withKey("epochs", epochs)});
 
   auto optimizer = ml::train::createOptimizer("sgd", {"learning_rate=0.001"});
   model->setOptimizer(std::move(optimizer));
 
-  int status = model->compile();
-  if (status) {
-    throw std::invalid_argument("model compilation failed!");
-  }
-
-  status = model->initialize();
-  if (status) {
-    throw std::invalid_argument("model initialization failed!");
-  }
+  model->compile();
+  model->initialize();
 
   auto dataset_train = ml::train::createDataset(
     ml::train::DatasetType::GENERATOR, trainData_cb, train_user_data.get());
-  auto dataset_valid = ml::train::createDataset(
-    ml::train::DatasetType::GENERATOR, validData_cb, valid_user_data.get());
 
   model->setDataset(ml::train::DatasetModeType::MODE_TRAIN,
                     std::move(dataset_train));
-  model->setDataset(ml::train::DatasetModeType::MODE_VALID,
-                    std::move(dataset_valid));
 
   model->train();
-
-#if defined(ENABLE_TEST)
-  model->exports(ml::train::ExportMethods::METHOD_TFLITE, "resnet_test.tflite");
-  training_loss = model->getTrainingLoss();
-  validation_loss = model->getValidationLoss();
-#endif
 }
 
-std::array<UserDataType, 2>
-createFakeDataGenerator(unsigned int batch_size,
-                        unsigned int simulated_data_size,
-                        unsigned int data_split) {
+std::array<UserDataType, 1> createFakeDataGenerator(unsigned int batch_size) {
+
   UserDataType train_data(new nntrainer::util::RandomDataLoader(
-    {{batch_size, 3, 32, 32}}, {{batch_size, 1, 1, 100}},
-    simulated_data_size / data_split));
-  UserDataType valid_data(new nntrainer::util::RandomDataLoader(
-    {{batch_size, 3, 32, 32}}, {{batch_size, 1, 1, 100}},
-    simulated_data_size / data_split));
+    {{batch_size, 3, 32, 32}}, {{batch_size, 1, 1, 100}}, batch_size));
 
-  return {std::move(train_data), std::move(valid_data)};
-}
-
-std::array<UserDataType, 2>
-createRealDataGenerator(const std::string &directory, unsigned int batch_size,
-                        unsigned int data_split) {
-
-  UserDataType train_data(new nntrainer::util::Cifar100DataLoader(
-    directory + "/train.bin", batch_size, data_split));
-  UserDataType valid_data(new nntrainer::util::Cifar100DataLoader(
-    directory + "/test.bin", batch_size, data_split));
-
-  return {std::move(train_data), std::move(valid_data)};
+  return {std::move(train_data)};
 }
 
 int main(int argc, char *argv[]) {
-  if (argc < 5) {
-    std::cerr
-      << "usage: ./main [{data_directory}|\"fake\"] [batchsize] [data_split] "
-         "[epoch] \n"
-      << "when \"fake\" is given, original data size is assumed 512 for both "
-         "train and validation\n";
-    return EXIT_FAILURE;
+  std::cout << "Resnet18" << std::endl;
+  
+  if (argc < 3) {
+    std::cout << "Usage: " << argv[0] << " [batch_size] [epoch]" << std::endl;
+    return 0;
   }
+  unsigned int batch_size = std::stoul(argv[1]);
+  unsigned int epoch = std::stoul(argv[2]);
 
-  auto start = std::chrono::system_clock::now();
-  std::time_t start_time = std::chrono::system_clock::to_time_t(start);
-  std::cout << "started computation at " << std::ctime(&start_time)
-            << std::endl;
+  std::array<UserDataType, 1> user_datas;
+  user_datas = createFakeDataGenerator(batch_size);
 
-#ifdef PROFILE
-  auto listener =
-    std::make_shared<nntrainer::profile::GenericProfileListener>();
-  nntrainer::profile::Profiler::Global().subscribe(listener);
-#endif
-
-  std::string data_dir = argv[1];
-  unsigned int batch_size = std::stoul(argv[2]);
-  unsigned int data_split = std::stoul(argv[3]);
-  unsigned int epoch = std::stoul(argv[4]);
-
-  std::cout << "data_dir: " << data_dir << ' ' << "batch_size: " << batch_size
-            << " data_split: " << data_split << " epoch: " << epoch
-            << std::endl;
-
-  /// warning: the data loader will be destroyed at the end of this function,
-  /// and passed as a pointer to the databuffer
-  std::array<UserDataType, 2> user_datas;
-
-  try {
-    if (data_dir == "fake") {
-      user_datas = createFakeDataGenerator(batch_size, 512, data_split);
-    } else {
-      user_datas = createRealDataGenerator(data_dir, batch_size, data_split);
-    }
-  } catch (const std::exception &e) {
-    std::cerr << "uncaught error while creating data generator! details: "
-              << e.what() << std::endl;
-    return EXIT_FAILURE;
-  }
-
-  auto &[train_user_data, valid_user_data] = user_datas;
-
-  try {
-    createAndRun(epoch, batch_size, train_user_data, valid_user_data);
-  } catch (const std::exception &e) {
-    std::cerr << "uncaught error while running! details: " << e.what()
-              << std::endl;
-    return EXIT_FAILURE;
-  }
-  auto end = std::chrono::system_clock::now();
-
-  std::chrono::duration<double> elapsed_seconds = end - start;
-  std::time_t end_time = std::chrono::system_clock::to_time_t(end);
-
-  std::cout << "finished computation at " << std::ctime(&end_time)
-            << "elapsed time: " << elapsed_seconds.count() << "s\n";
-
-#ifdef PROFILE
-  std::cout << *listener;
-#endif
-
-  int status = EXIT_SUCCESS;
-#if defined(ENABLE_TEST)
-  try {
-    testing::InitGoogleTest(&argc, argv);
-  } catch (...) {
-    std::cerr << "Error during InitGoogleTest" << std::endl;
-    return EXIT_FAILURE;
-  }
-
-  try {
-    status = RUN_ALL_TESTS();
-  } catch (...) {
-    std::cerr << "Error during RUN_ALL_TESTS()" << std::endl;
-  }
-#endif
-
-  return status;
+  auto &[train_user_data] = user_datas;
+  createAndRun(epoch, batch_size, train_user_data);
+  return 0;
 }
