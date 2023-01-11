@@ -45,6 +45,7 @@
 #include <optimized_v1_planner.h>
 #include <optimized_v2_planner.h>
 #include <optimized_v3_planner.h>
+#include <profiler.h>
 #include <tensor_pool.h>
 #include <tensor_wrap_specs.h>
 #include <util_func.h>
@@ -710,6 +711,8 @@ void Manager::flushCacheExcept(unsigned int order) {
   if (swap_lookahead == 1) {
     if (async_task_eos.count(order) == 1)
       waitComplete(order);
+
+    PROFILE_MEM_ANNOTATE("START Preloading: " + std::to_string(order + 1));
 
     auto load_weight = loadAsync(weight_pool, order + 1);
     auto load_tensor = loadAsync(tensor_pool, order + 1);

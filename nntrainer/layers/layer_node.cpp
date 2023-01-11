@@ -610,8 +610,9 @@ void LayerNode::forwarding(bool training) {
  * @brief     calc the derivative to be passed to the previous layer
  */
 void LayerNode::calcDerivative() {
+  auto d = std::get<2>(getExecutionOrder());
   PROFILE_TIME_START(calc_deriv_event_key);
-  PROFILE_MEM_ANNOTATE("CalcDerivative: " + getName());
+  PROFILE_MEM_ANNOTATE("CalcDerivative: " + getName() + ":" + std::to_string(d));
   layer->calcDerivative(*run_context);
   PROFILE_TIME_END(calc_deriv_event_key);
   TRACE_MEMORY() << getName() + ": CD";
@@ -628,9 +629,10 @@ void LayerNode::calcDerivative() {
  * @brief     Calculate the derivative of a layer
  */
 void LayerNode::calcGradient() {
+  auto g = std::get<1>(getExecutionOrder());
   PROFILE_TIME_START(calc_grad_event_key);
   if (needs_calc_gradient) {
-    PROFILE_MEM_ANNOTATE("CalcGradient: " + getName());
+    PROFILE_MEM_ANNOTATE("CalcGradient: " + getName() + ":" + std::to_string(g));
     layer->calcGradient(*run_context);
     TRACE_MEMORY() << getName() + ": CG";
     TRACE_TIME() << getName() + ": CG";

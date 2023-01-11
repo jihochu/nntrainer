@@ -363,12 +363,14 @@ NetworkGraph::forwarding(bool training,
                          std::function<bool(void *userdata)> stop_cb) {
   for (auto iter = cbegin(); iter != cend() && !stop_cb(nullptr); iter++) {
     auto const &ln = *iter;
-    PROFILE_TIME_START(profile_keys.at(ln->getType()));
-    PROFILE_MEM_ANNOTATE("Forwarding for layer: " + ln->getName());
 
     auto f = std::get<0>(ln->getExecutionOrder());
+    PROFILE_TIME_START(profile_keys.at(ln->getType()));
+
+    //auto f = std::get<0>(ln->getExecutionOrder());
     flushCacheExcept(f);
 
+    PROFILE_MEM_ANNOTATE("Forwarding for layer: " + ln->getName() + ":" + std::to_string(f));
     ln->forwarding(training);
 
     PROFILE_TIME_END(profile_keys.at(ln->getType()));
