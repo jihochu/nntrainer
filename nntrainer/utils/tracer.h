@@ -112,9 +112,9 @@ private:
 #ifndef TRACE
 
 #define TRACE_MEMORY_POINT(msg)
-#define TRACE_MEMORY()
+#define TRACE_MEMORY() std::ofstream(nullptr)
 #define TRACE_TIME_POINT(msg)
-#define TRACE_TIME()
+#define TRACE_TIME() std::ofstream(nullptr)
 
 #else
 
