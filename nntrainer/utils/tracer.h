@@ -203,6 +203,9 @@ private:
 
 } // namespace nntrainer
 
+#define TRACE_INIT()                      \
+  nntrainer::MemoryTracer::getInstance(); \
+  nntrainer::TimeTracer::getInstance();
 #define TRACE_MEMORY_POINT(msg) \
   nntrainer::MemoryTracer::getInstance()->tracePoint(msg)
 #define TRACE_MEMORY() *(nntrainer::MemoryTracer::getInstance())
@@ -212,6 +215,7 @@ private:
 
 #else
 
+#define TRACE_INIT()
 #define TRACE_MEMORY_POINT(msg)
 #define TRACE_MEMORY() std::ostream(nullptr)
 #define TRACE_TIME_POINT(msg)

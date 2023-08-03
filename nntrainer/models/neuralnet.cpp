@@ -49,6 +49,7 @@
 #include <recurrent_realizer.h>
 #include <remap_realizer.h>
 #include <slice_realizer.h>
+#include <tracer.h>
 #include <util_func.h>
 
 #ifdef ENABLE_TFLITE_INTERPRETER
@@ -80,6 +81,7 @@ NeuralNetwork::NeuralNetwork() :
   compiled(false),
   loadedFromConfig(false) {
   app_context = AppContext(AppContext::Global());
+  TRACE_INIT();
 }
 
 NeuralNetwork::NeuralNetwork(AppContext app_context_) :
@@ -97,7 +99,9 @@ NeuralNetwork::NeuralNetwork(AppContext app_context_) :
   initialized(false),
   compiled(false),
   loadedFromConfig(false),
-  app_context(app_context_) {}
+  app_context(app_context_) {
+  TRACE_INIT();
+}
 
 int NeuralNetwork::loadFromConfig(const std::string &config) {
   if (loadedFromConfig == true) {
