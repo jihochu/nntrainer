@@ -436,6 +436,14 @@ public:
   Tensor &getWeight(unsigned int idx) const;
 
   /**
+   * @brief Get the Weight master tensor object
+   *
+   * @param idx Identifier of the weight
+   * @return Tensor& Reference to the weight tensor
+   */
+  Tensor *getWeightMaster(unsigned int idx) const;
+
+  /**
    * @brief Get the Weight Gradient tensor object
    *
    * @note this method returns the fresh gradient to be filled
@@ -564,6 +572,11 @@ public:
   Tensor &getOutgoingDerivative(unsigned int idx);
 
   /**
+   * @brief validate input/output derivatives of the layer
+   */
+  bool validateDerivatives();
+
+  /**
    * @brief Get the Tensor object
    *
    * @param idx Identifier of the tensor
@@ -684,6 +697,14 @@ public:
    * @return unsigned int number of requested tensors
    */
   unsigned int getNumTensors() const { return tensors.size(); }
+
+  /**
+   * @brief Set the Weight Optimizer Variable tensor object
+   *
+   * @param idx Identifier of the weight
+   * @param jdx Identifier of the weight optimizer variable
+   */
+  void setWeightOptVars(unsigned int idx, std::vector<Tensor *> opts);
 
   /**
    * @brief Set the batch for the run context
